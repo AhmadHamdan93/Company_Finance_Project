@@ -1,0 +1,508 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Expenses</title>
+    
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'js/toastify.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        .btn_icon {
+          
+          border: none;
+          background-color: transparent;
+          color: rgb(243, 8, 8);
+          padding: 2px 6px;
+          font-size: 16px;
+          cursor: pointer;
+        }
+        
+        /* Darker background on mouse-over */
+        .btn_icon:hover {
+          background-color: red;
+          color:white;
+        }
+
+        .btn_icon_edit {
+          
+          border: none;
+          background-color: transparent;
+          color: black;
+          padding: 2px 6px;
+          font-size: 16px;
+          cursor: pointer;
+        }
+        
+        /* Darker background on mouse-over */
+        .btn_icon_edit:hover {
+          background-color: black;
+          color:white;
+        }
+        </style>
+
+<!-- ////// For include jquery lib //////// -->
+<script src=
+    "https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js">
+</script>
+
+<!-- ////// For importing JSON data file //////// -->
+<script>
+  // variables and data coming from server
+  var tempCostExpense = 0;  // this variable for save cost value when click on edit
+  var current_row = -1;  //this variable control by ways flow data and active/diseable some element in data table 
+  var current_id = "{{currentID}}";
+  var currentProjectExpenses = JSON.parse('{{expense|escapejs}}');
+  var currentProjectYearlyBudgets = JSON.parse('{{budget|escapejs}}');
+  myProject = JSON.parse('{{project|escapejs}}');
+  currentProject = myProject[0] // the myproject is array contian one element
+  var successColor = "#4fbe87"
+  var errorColor = "#e63946"
+</script>
+
+<script>
+  function calculateTotalCostUntilNow(projectId){
+      var totalCost = 0
+      for(const expenseKey in currentProjectExpenses) {
+          const expense = currentProjectExpenses[expenseKey];
+          if(expense.fields.project_id == projectId)
+              totalCost += expense.fields.cost
+      }
+      return totalCost
+  }
+
+  function calculateSumYearsBudgets(projectId){
+      var totalBudget = 0
+      for(const key in currentProjectYearlyBudgets) {
+          const budget = currentProjectYearlyBudgets[key];
+          if(budget.fields.project_id == projectId)
+              totalBudget += budget.fields.budget
+      }
+      return totalBudget
+  }
+
+  function calculateRemainingBalance(projectId){
+      let totalCost = calculateTotalCostUntilNow(projectId)
+      let totalBudget = calculateSumYearsBudgets(projectId)
+      return totalBudget - totalCost
+  }
+</script>
+
+</head>
+
+<body>
+    <div id="app" style="padding: 50px;">           
+            <div class="page-heading">
+                <div class="page-title">
+                    <div class="row">
+                        <div class="col-12 col-md-6 order-md-1 order-last">
+                            <h3>Project Expenses Table</h3>
+                            <p id="remainingBalance" class="text-subtitle text-muted">The Remaining Balance : $ <script>document.write(calculateRemainingBalance(current_id))</script></p>
+                        </div>
+                        <div class="col-12 col-md-6 order-md-2 order-first">
+                            <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
+                                <ol class="breadcrumb">
+                                    <li class="breadcrumb-item">
+                                      <script>
+                                        document.write("<a href='{% url 'projectdetails' currentID %}'>Back</a>")
+                                      </script>
+                                      
+                                    </li>
+                                </ol>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="section">
+                    <div class="container" style="background-color: white;border-radius: 20px;padding: 10px;">
+                        <div style="width: 50%; margin-left: auto;margin-right: auto;margin-top: 10px;margin-bottom: 10px;">
+                            <div class="input-group">
+                              <input type="text" class="form-control" placeholder="Enter for Search by" name="search" id="searchInput" onkeyup="searchRecords();">
+                              <div class="input-group-btn">
+                                
+                                <select class="form-select" id="sel1" name="sellist1" id="searchSelect">
+                                  <!--option value="">Expenses No</option>
+                                  <option>Project number</option>
+                                  <option>Date</option-->
+                                  <option>Operation</option>
+                                </select>
+
+                              </div>
+                            </div>
+                          </div>          
+                        
+                        <table class="table table-light" id="expensesTable">
+                          <thead>
+                            <tr>
+                                <th></th>
+                                
+                                <!--<th >Project Number</th>-->
+                                <th >Date</th>
+                                <th >Cost</th>
+                                <th >Operation</th>
+                                <th >More Info</th>
+                                <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+
+                            <!-- ////////// DYNAMIC PART ////////////-->
+                            <script>
+                                text = ""
+                                for (const expenseKey in currentProjectExpenses) {
+                                    const expense = currentProjectExpenses[expenseKey];
+
+                                    text += "<tr id='expenseRow"+expense.pk+"'>"+
+                                          "<td><button class='btn_icon_edit' id='editButton' onclick='rowEditeble("+expense.pk+");'><i class='fa fa-edit'></i></button><button class='btn_icon' onclick='deleteRow("+expense.pk+");'><i class='fa fa-trash'></i></button></td>"+
+                                          "<td>" + "<input type='date' class='form-control' id='txt_date"+expense.pk+"' placeholder='' name='txt_date"+expense.pk+"' value='"+expense.fields.date+"' disabled>" + "</td>"+
+                                          "<td>" + "<input type='number' class='form-control' id='txt_cost"+expense.pk+"' placeholder='' name='txt_cost"+expense.pk+"' value='"+expense.fields.cost+"' disabled>" + "</td>"+
+                                          "<td>" + "<input type='text' class='form-control' id='txt_operation"+expense.pk+"' placeholder='' name='txt_operation"+expense.pk+"' value='"+expense.fields.operation+"' disabled>" + "</td>"+
+                                          "<td>" + "<input type='text' class='form-control' id='txt_moreInfo"+expense.pk+"' placeholder='' name='txt_moreInfo"+expense.pk+"' value='"+expense.fields.more_info+"' disabled>" + "</td>"+
+                                          "<td><button class='btn btn-outline-success' id='txt_saveBtn"+expense.pk+"' onclick='saveRecord("+expense.pk+");' disabled>Save</button></td>"
+                                          "</tr>";       
+                            
+                                }
+                                document.write(text)      
+                            </script>
+                            <!-- /////////////////////////////////////--> 
+
+                          </tbody>
+                        </table>
+                        
+                        
+                        <div class="row">
+                            <div class="row">
+                                <div class="col-12 col-md-6 order-md-1 order-last">
+                                    <!--button type="button" class="btn btn-outline-success" onclick="saveFunction();">Save</button-->
+                                </div>
+                                <div class="col-12 col-md-6 order-md-2 order-last">
+                                    <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
+                                        <ol class="breadcrumb">
+                                            <button type="button" id="add" class="btn btn-primary" onclick="addRecord();">add record</button>
+                                        </ol>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+
+                      </div>
+                </section>
+
+            </div>
+
+            
+    </div>
+
+
+    <script src="{% static 'js/mazer.js' %}"></script>
+    <script src="{% static 'js/toastify.js' %}"></script>
+
+    <!-- ///////////////////   Jquery Functions ///////////////////////// -->
+    <!-- ///////////////////   Edit Function  ///////////////////////// -->
+    <script>
+      // Edit Function is active when click on edit icon
+        function rowEditeble(numberRow){
+          if(current_row == -1 || numberRow == 0){
+            $('#add').attr('disabled', 'disabled');
+
+            $('#txt_date'+numberRow).removeAttr('disabled');
+            $('#txt_cost'+numberRow).removeAttr('disabled');
+            $('#txt_operation'+numberRow).removeAttr('disabled');
+            $('#txt_moreInfo'+numberRow).removeAttr('disabled');
+            $('#txt_saveBtn'+numberRow).removeAttr('disabled');
+
+            current_row = numberRow;
+            // console.log(current_row)
+            // console.log(numberRow)
+            tempCostExpense = parseInt($('#txt_cost'+numberRow).val());
+
+          }else{
+            // alert("Please, there is an open Row that must be closed first ")
+            showMessage("Please, there is an open Row that must be closed first",errorColor);
+          }
+          
+          
+        }
+
+      function getSumExpensesForYear(year){
+        var totalCost = 0
+        for(const expenseKey in currentProjectExpenses) {
+            const expense = currentProjectExpenses[expenseKey];
+            let expenseYear = Date.parse(expense.fields.date).getFullYear
+            if(expenseYear == year)   // expense.project_id == currentProjectId &&
+                totalCost += expense.fields.cost
+        }
+        console.log('totalCost')
+        console.log(totalCost)
+        return totalCost
+      }
+
+      function getYearBudget(year){
+        let budget = currentProjectYearlyBudgets.find(x => x.fields.year == year)    // && x.project_id == currentProjectId
+        console.log('budget')
+        console.log(budget.fields.budget)
+        return budget.fields.budget 
+      }
+
+      // Save one record funtion //
+      function saveRecord(expenseId){
+        
+        date = $('#txt_date'+expenseId).val();
+        cost = parseInt($('#txt_cost'+expenseId).val());
+        operation = $('#txt_operation'+expenseId).val();
+        moreInfo = $('#txt_moreInfo'+expenseId).val();
+        
+        // validation //
+        let year = new Date(date).getFullYear();
+        // let sumExpenses = getSumExpensesForYear(year)
+        // let yearBudget = getYearBudget(year)
+        let remaining = calculateRemainingBalance(current_id) + tempCostExpense;  //yearBudget - sumExpenses
+        // console.log('remaining')
+        // console.log(remaining)
+
+        if(isNaN(cost)){
+          showMessage("Enter number for expense",errorColor);
+          // alert("Enter number for expense")
+        }
+        else if(cost > remaining){
+          showMessage("You needed the budget for this year, the Cost is greater than Budget",errorColor);
+          // alert("You needed the budget for this year")
+        }
+        else if(!isNaN(date)){
+          // console.log(year)
+          showMessage("Please Enter year",errorColor);
+          // alert("Please Enter year")
+        }
+        else if(!isNaN(operation)){
+          // console.log(operation +" : df")
+          showMessage("Please Enter operation",errorColor);
+          // alert("Please Enter operation")
+        }
+        else if(!isNaN(moreInfo)){
+          // console.log(moreInfo +" : df")
+          showMessage("Please Enter more Info",errorColor);
+          // alert("Please Enter moreInfo")
+        }
+        else{
+          // insert or update data
+          if(current_row == 0){
+            // insert data to database
+            // here we need to render for recreate page for new row take new id 
+            // forethere we dont need to modify current_row renew
+            // ajax for 
+            $.ajax({
+              type: 'POST',
+              url:'/pathinsertExpenses/',
+              data:{
+                  projectID:current_id,
+                  date:date,
+                  cost:cost,
+                  operation:operation,
+                  moreInfo:moreInfo,
+                  'csrfmiddlewaretoken': "{{ csrf_token }}"
+                  },
+                  success: function (data){
+                    window.location.reload();
+                  },
+                  error: function (jqXHR, error, errorThrown) {
+                  //display error
+                  // alert("Failed Insert")
+                  showMessage("Failed Insert",errorColor);
+                  tempCostExpense = 0;
+                  },
+                });
+            // end ajax
+          }else{
+            // update data into database
+            // here we  dont need to render for recreate page for new row take new id 
+            // ajax for 
+            $.ajax({
+              type: 'POST',
+              url:'/pathupdateExpenses/',
+              data:{
+                  currentID:expenseId,
+                  projectID:current_id,
+                  date:date,
+                  cost:cost,
+                  operation:operation,
+                  moreInfo:moreInfo,
+                  'csrfmiddlewaretoken': "{{ csrf_token }}"
+                  },
+              success: function (data){
+                
+                  // it is success
+                  successUpdate(data,expenseId);
+                  tempCostExpense = 0;
+                
+              },
+              cache: false,
+              async: true,
+              error: function (jqXHR, error, errorThrown) {
+                  //display error
+                  // alert("Failed Update");
+                  showMessage("Failed Update",errorColor);
+                  tempCostExpense = 0;
+              }
+            });
+            // end ajax
+          }
+        }
+      }
+
+      // delete Function
+      function deleteRow(expenseId){
+        if(current_row > 0 && current_row == expenseId){      // when one delete same one edit
+          // delete from server
+          // when edit element then remove
+          // ajax for 
+          $.ajax({
+            type: 'POST',
+            url:'/pathdeleteExpenses/',
+            data:{
+                projectID:current_id,
+                currentID:expenseId,
+                'csrfmiddlewaretoken': "{{ csrf_token }}"
+                },
+                success: function (data){
+                    // it is success
+                    successDelete(data,expenseId);
+                    tempCostExpense = 0;       
+                },
+                error: function (jqXHR, error, errorThrown) {
+                  //display error
+                  // alert("Failed Delete")
+                  showMessage("Failed Delete",errorColor);
+                  tempCostExpense = 0;
+                },
+              });
+          // end ajax
+          
+
+        }else if(current_row == 0 && current_row == expenseId){   // if just add row then delete it before saving
+
+          $('#expenseRow'+expenseId).remove();
+          $('#add').removeAttr('disabled');
+          current_row = -1
+          tempCostExpense = 0;
+
+        }else{
+          if(current_row == -1){      // if normal delete
+            $.ajax({
+            type: 'POST',
+            url:'/pathdeleteExpenses/',
+            data:{
+                projectID:current_id,
+                currentID:expenseId,
+                'csrfmiddlewaretoken': "{{ csrf_token }}"
+                },
+                success: function (data){
+                    // it is success
+                    successDelete(data,expenseId);
+                    tempCostExpense = 0;
+                },
+                error: function (jqXHR, error, errorThrown) {
+                  //display error
+                  // alert("Failed Delete")
+                  showMessage("Failed Delete",errorColor);
+                  tempCostExpense = 0;
+                },
+              });
+          // end ajax
+          }else{
+          // no delete , its warring
+          // you must close open row then delete this
+          // alert("you must close open row then delete this")
+          showMessage("you must close open row then delete this",errorColor);
+          }
+
+        }
+      }
+      
+      // search 
+      function searchRecords(){
+        var input, filter, table, tr, td, i, txtValue;
+        input = document.getElementById("searchInput");
+        searchText = input.value
+        
+        for (const expenseKey in currentProjectExpenses) {
+          const expense = currentProjectExpenses[expenseKey];
+          if(expense.fields.operation.includes(searchText)){
+            $('#expenseRow'+expense.pk).show()
+          }
+          else{
+            $('#expenseRow'+expense.pk).hide()
+          }
+        }
+      }
+     
+      // add record
+      function addRecord(){
+        tempCostExpense = 0;
+        current_row =0;
+        var newId = 0;
+        $('#add').attr('disabled', 'disabled');
+
+        newRow = "<tr id='expenseRow"+newId+"'>"+
+                      "<td><button class='btn_icon_edit' id='editButton' onclick='rowEditeble("+newId+");'><i class='fa fa-edit'></i></button><button class='btn_icon' onclick='deleteRow("+newId+");'><i class='fa fa-trash'></i></button></td>"+
+                      "<td>" + "<input type='date' class='form-control' id='txt_date"+newId+"' placeholder='' name='txt_date"+newId+"' value='2022-03-01' >" + "</td>"+
+                      "<td>" + "<input type='number' class='form-control' id='txt_cost"+newId+"' placeholder='' name='txt_cost"+newId+"' value='' >" + "</td>"+
+                      "<td>" + "<input type='text' class='form-control' id='txt_operation"+newId+"' placeholder='' name='txt_operation"+newId+"' value=''>" + "</td>"+
+                      "<td>" + "<input type='text' class='form-control' id='txt_moreInfo"+newId+"' placeholder='' name='txt_moreInfo"+newId+"' value=''>" + "</td>"+
+                      "<td><button class='btn btn-outline-success' id='txt_saveBtn"+newId+"' onclick='saveRecord("+newId+");'>Save</button></td>"
+                      "</tr>"; 
+        $('#expensesTable tr:first').after(newRow);
+      }
+
+      function successUpdate(data,expenseId){
+        current_row = -1;
+        $('#add').removeAttr('disabled');
+        // re-disable record fields //
+        $('#txt_date'+expenseId).attr('disabled', 'disabled');
+        $('#txt_cost'+expenseId).attr('disabled', 'disabled');
+        $('#txt_operation'+expenseId).attr('disabled', 'disabled');
+        $('#txt_moreInfo'+expenseId).attr('disabled', 'disabled');
+        $('#txt_saveBtn'+expenseId).attr('disabled', 'disabled');
+        // refesh remaining data 
+        currentProjectExpenses = data;  
+        document.getElementById("remainingBalance").innerText = "The Remaining Balance : $ "+ calculateRemainingBalance(current_id);
+        showMessage("Successfully Update",successColor);
+      }
+
+      function successDelete(data,expenseId){
+        $('#expenseRow'+expenseId).remove();
+        $('#add').removeAttr('disabled');
+        current_row = -1; 
+        // refesh remaining data
+        currentProjectExpenses = data;  
+        document.getElementById("remainingBalance").innerText = "The Remaining Balance : $ "+ calculateRemainingBalance(current_id);
+        showMessage("Successfully Deleted",successColor);
+      }
+
+      function showMessage(msg,color){
+        // success color :  "#4fbe87"
+        // fail color :  "#e63946"
+      Toastify({
+            text: msg,
+            duration: 3000,
+            close:true,
+            gravity:"top",
+            position: "center",
+            backgroundColor: color,
+        }).showToast();
+    }
+
+
+    </script>
+
+
+</body>
+
+</html>
